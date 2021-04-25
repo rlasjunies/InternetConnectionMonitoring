@@ -44,7 +44,7 @@ namespace icm
 
                 }
 
-                LetWaitFewSeconds(conf)
+                LetWaitFewSeconds(conf);
             }
 
 
