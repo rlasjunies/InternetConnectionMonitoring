@@ -1,23 +1,47 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace icm
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static Task Main(string[] args)
         {
+
             ICM.pingServersResult pingsResults;
-            var conf = new Configuration
-            {
-                IPs = new List<string>(new string[] { "8.8.8.8", "4.2.2.2", "208.67.222.222" }),
-                poolingFrequency = 1000,
+            ICMConfiguration conf = new ICMConfiguration {
+                servers = new List<string>(new string[] { "8.8.8.8", "4.2.2.2", "208.67.222.222" }),
+                frequency = 1000,
             };
+
+            Host.CreateDefaultBuilder(args)
+                .ConfigureAppConfiguration((hostingContext, configuration) =>
+                {
+                    configuration.Sources.Clear();
+
+                    IHostEnvironment env = hostingContext.HostingEnvironment;
+
+                    configuration
+                        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                        .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true);
+
+                    IConfigurationRoot configurationRoot = configuration.Build();
+
+                    ICMConfiguration options = new();
+                    configurationRoot.GetSection("ping").Bind(options);
+
+                    conf = options;
+                })
+                .Build();
 
             while (true)
             {
                 var now = DateTime.Now.ToLocalTime();
-                pingsResults = ICM.pingServers(conf.IPs);
+                pingsResults = ICM.pingServers(conf.servers);
                 if (pingsResults.AtLeastOneServerReachable)
                 {
                     ReportPingsResults(pingsResults, now);
@@ -30,7 +54,7 @@ namespace icm
                         var nowDisconnected = DateTime.Now.ToLocalTime();
                         var durationDisconnection = nowDisconnected - now;
 
-                        pingsResults = ICM.pingServers(conf.IPs);
+                        pingsResults = ICM.pingServers(conf.servers);
                         if (pingsResults.AtLeastOneServerReachable)
                         {
                             disconnected = ConnectionIsBack(now, durationDisconnection);
@@ -84,9 +108,9 @@ namespace icm
                 ConsoleBackToBeginningOfTheLine();
             }
 
-            static void LetWaitFewSeconds(Configuration conf)
+            static void LetWaitFewSeconds(ICMConfiguration conf)
             {
-                System.Threading.Thread.Sleep(conf.poolingFrequency);
+                System.Threading.Thread.Sleep(conf.frequency);
             }
         }
     }
