@@ -45,7 +45,7 @@ namespace icm
         // ping a server list, 
         // return false if none are reachable, 
         // true elsewhere
-        public static pingServersResult pingServers_TrueIfAtLeastOneIsReached(List<string> serversIP)
+        public static pingServersResult pingServers(List<string> serversIP)
         {
 
             // var now = DateTime.Now.ToLocalTime();

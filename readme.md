@@ -6,11 +6,13 @@ This program test the connection to internet performing ping on several server.
 
 * download the repo
 * run the program by `dotnet run`
-
+* `ctrl+C` to stop the program
+* 
 # To do
-- [x] initialize pooling, log in the console
-- [ ] export log file
-- [ ] when disconnect long period, count down the disconnection. When connection is up again, calculate the duration without connection
-- [ ] provide GUI
-- [ ] play sound when disconnecting, connecting again
+- [x] Initialize program, log in the console
+- [x] Calculate disconnection duration and show in the log 
+- [ ] Provide GUI
+- [ ] Configuration file 
+- [ ] Export log file
+- [ ] Play sound when disconnecting, connecting again
 
