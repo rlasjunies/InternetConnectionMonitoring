@@ -5,7 +5,7 @@ This tool tests the connection to internet performing ping on several internet s
 Every 5 seconds the program pings several servers and report the performance in the console and in a file. If none of the server answers it means the communication is down (network or server). While the communication is down, the tool continues to ping the servers waiting at least one server response, meaning the communication is back.
 When the communication is back, the tool traces the duration of the disconnection and restart checking of the connection. 
 
-![Console output](/assets/ConsoleExample.png "Console output example")
+![Console output](/assets/ConsoleExample_.png "Console output example")
 
 ![File log](/assets/FileExample.png "File log example")
 
