@@ -48,7 +48,6 @@ namespace icm
         public static pingServersResult pingServers(List<string> serversIP)
         {
 
-            // var now = DateTime.Now.ToLocalTime();
             var IsOneServerReachable = false;
             List<pingOneServerResult> pingsResults = new List<pingOneServerResult>{};
             foreach (var serverIP in serversIP)
@@ -62,8 +61,6 @@ namespace icm
                 pingServersResults = pingsResults,
                 AtLeastOneServerReachable = IsOneServerReachable
             };
-            //     Console.WriteLine($"{now}-Ping:{reply.Address.ToString()}-{reply.RoundtripTime}");
-            //     Console.WriteLine($"{now}-Ping:{reply.Address.ToString()}-Ping fail");
         }
 
         public record pingServersResult

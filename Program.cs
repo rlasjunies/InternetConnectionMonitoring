@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using System.IO;
 
 namespace icm
 {
@@ -13,30 +14,7 @@ namespace icm
         {
 
             ICM.pingServersResult pingsResults;
-            ICMConfiguration conf = new ICMConfiguration {
-                servers = new List<string>(new string[] { "8.8.8.8", "4.2.2.2", "208.67.222.222" }),
-                frequency = 1000,
-            };
-
-            Host.CreateDefaultBuilder(args)
-                .ConfigureAppConfiguration((hostingContext, configuration) =>
-                {
-                    configuration.Sources.Clear();
-
-                    IHostEnvironment env = hostingContext.HostingEnvironment;
-
-                    configuration
-                        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                        .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true);
-
-                    IConfigurationRoot configurationRoot = configuration.Build();
-
-                    ICMConfiguration options = new();
-                    configurationRoot.GetSection("ping").Bind(options);
-
-                    conf = options;
-                })
-                .Build();
+            ICMConfiguration conf = LoadConfiguration(args);
 
             while (true)
             {
@@ -44,42 +22,29 @@ namespace icm
                 pingsResults = ICM.pingServers(conf.servers);
                 if (pingsResults.AtLeastOneServerReachable)
                 {
-                    ReportPingsResults(pingsResults, now);
+                    OutputOkPingsResults(pingsResults, now, conf);
                 }
                 else
                 {
-                    var disconnected = true;
-                    while (disconnected)
-                    {
-                        var nowDisconnected = DateTime.Now.ToLocalTime();
-                        var durationDisconnection = nowDisconnected - now;
-
-                        pingsResults = ICM.pingServers(conf.servers);
-                        if (pingsResults.AtLeastOneServerReachable)
-                        {
-                            disconnected = ConnectionIsBack(now, durationDisconnection);
-                        }
-                        else
-                        {
-                            StillNotConnection(nowDisconnected, durationDisconnection);
-                        }
-                        LetWaitFewSeconds(conf);
-                    }
+                    var disconnectionDuration = LoopWhileNoConnection(now, conf);
+                    OutputReconnection(now, disconnectionDuration, conf);
 
                 }
 
                 LetWaitFewSeconds(conf);
             }
 
-
-            static void ReportPingsResults(ICM.pingServersResult pingsResults, DateTime now)
+            static void OutputOkPingsResults(ICM.pingServersResult pingsResults, DateTime now, ICMConfiguration conf)
             {
-                Console.WriteLine($"---");
+                var pingRoundtripsTimeOutput = "";
                 foreach (var serverResult in pingsResults.pingServersResults)
                 {
-                    var roundTrip = serverResult.RoundtripTime == 0 ? "--" : serverResult.RoundtripTime.ToString();
-                    Console.WriteLine($"{now}|server:{serverResult.ServerIP}|reached:{serverResult.Reachable}|roundtrip:{roundTrip}");
+                    pingRoundtripsTimeOutput += serverResult.RoundtripTime == 0 ? "---" : serverResult.RoundtripTime.ToString().PadLeft(3, ' ');
+                    pingRoundtripsTimeOutput += "|";
                 }
+                var outputString = $"{now}|OK         |{pingRoundtripsTimeOutput}";
+                Console.WriteLine(outputString);
+                if (conf.loginfile) outputInFile(outputString);
             }
 
             static void ConsoleBackToBeginningOfTheLine()
@@ -95,22 +60,101 @@ namespace icm
                 }
             }
 
-            static bool ConnectionIsBack(DateTime now, TimeSpan durationDisconnection)
+            static void outputInFile(string outputString)
             {
-                bool disconnected = false;
-                Console.WriteLine($"{now}|disconnected during: {durationDisconnection.ToHumanReadableString()}                                                                                                    ");
-                return disconnected;
+                string path = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                var fileName = System.IO.Path.GetDirectoryName(path)
+                                + "\\icm."
+                                + DateTime.Now.Year.ToString()
+                                + DateTime.Now.Month.ToString().PadLeft(2, '0')
+                                + DateTime.Now.Day.ToString().PadLeft(2, '0')
+                                + ".csv";
+                try
+                {
+                    File.AppendAllText(fileName, outputString + Environment.NewLine);
+                }
+                catch (Exception Ex)
+                {
+                    Console.WriteLine(Ex.ToString());
+                }
             }
 
-            static void StillNotConnection(DateTime nowDisconnected, TimeSpan durationDisconnection)
+            static void OutputNoConnection(DateTime nowDisconnected, TimeSpan durationDisconnection, ICMConfiguration conf)
             {
-                Console.WriteLine($"{nowDisconnected}|pings are failing, disconnected since: {durationDisconnection.ToHumanReadableString()}");
+                var outputString = $"{nowDisconnected}|KO         |pings are failing, disconnected since: {durationDisconnection.ToHumanReadableString()}";
+                Console.WriteLine(outputString);
                 ConsoleBackToBeginningOfTheLine();
+                if (conf.loginfiledisconnected) outputInFile(outputString);
             }
 
             static void LetWaitFewSeconds(ICMConfiguration conf)
             {
                 System.Threading.Thread.Sleep(conf.frequency);
+            }
+
+            static ICMConfiguration LoadConfiguration(string[] args)
+            {
+                // default configuration
+                ICMConfiguration conf = new ICMConfiguration { };
+
+                Host.CreateDefaultBuilder(args)
+                    .ConfigureAppConfiguration((hostingContext, configuration) =>
+                    {
+                        configuration.Sources.Clear();
+
+                        IHostEnvironment env = hostingContext.HostingEnvironment;
+
+                        configuration
+                            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                            .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, true);
+
+                        IConfigurationRoot configurationRoot = configuration.Build();
+
+                        ICMConfiguration options = new();
+                        configurationRoot.GetSection("ping").Bind(options);
+
+                        conf = options;
+                    })
+                    .Build();
+                return conf;
+            }
+
+            static TimeSpan LoopWhileNoConnection(DateTime disconnectionStartTime, ICMConfiguration conf)
+            {
+                var disconnected = true;
+                TimeSpan durationDisconnection = TimeSpan.Zero;
+
+                while (disconnected)
+                {
+                    var nowDisconnected = DateTime.Now.ToLocalTime();
+                    durationDisconnection = nowDisconnected - disconnectionStartTime;
+
+                    var pingsResults = ICM.pingServers(conf.servers);
+                    disconnected = !pingsResults.AtLeastOneServerReachable;
+
+                    OutputNoConnection(nowDisconnected, durationDisconnection, conf);
+
+                    LetWaitFewSeconds(conf);
+                }
+
+                return durationDisconnection;
+
+            }
+
+            static void OutputReconnection(DateTime now, TimeSpan disconnectionDuration, ICMConfiguration conf)
+            {
+                ClearCurrentConsoleLine();
+                var outputString = $"{now}|RECONNECTED|{disconnectionDuration.Seconds.ToString().PadLeft(3, ' ')}|Disconnected during : {disconnectionDuration.ToHumanReadableString()}";
+                Console.WriteLine(outputString);
+                if (conf.loginfile) outputInFile(outputString);
+            }
+
+            static void ClearCurrentConsoleLine()
+            {
+                int currentLineCursor = Console.CursorTop;
+                Console.SetCursorPosition(0, Console.CursorTop);
+                Console.Write(new string(' ', Console.WindowWidth));
+                Console.SetCursorPosition(0, currentLineCursor);
             }
         }
     }
