@@ -77,6 +77,7 @@ The file is automatically generated side to the program with the pattern `icm.yy
 - [x] Calculate disconnection duration and show in the log 
 - [x] Configuration file 
 - [x] Log in file
-- [ ] Provide GUI
+- [ ] Provide GUI (systray?)
 - [ ] Play sound when disconnecting, connecting again
+- [ ] support when network card is not connected (currently there is weird error :-( ))
 
